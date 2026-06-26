@@ -1,0 +1,17 @@
+.DS_Store
+*.log
+
+# Local editor and tool state
+.idea/
+.vscode/
+
+# Python cache
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Node cache and installs, for any bundled tool examples
+node_modules/
+dist/
+build/
+
