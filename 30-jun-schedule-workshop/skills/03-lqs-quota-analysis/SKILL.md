@@ -36,17 +36,27 @@ Fetch the data needed by this stage directly:
 - `/workspace/v1/orgs/current` for current organisation and timezone.
 - `/workspace/v1/staff`, including access level and `sgStatutory.isPayingCpf`.
 - `/workspace/v1/roles` and `/workspace/v1/sections`.
-- `/workspace/v2/shifts` and `/workspace/v2/shift-slots` for the visible report range.
-- `/workspace/v2/compensation-snapshots` for visible-range dates needed by the report.
 - `/workspace/v2/shifts` and `/workspace/v2/shift-slots` for the selected LQS analysis month.
 - `/workspace/v2/compensation-snapshots` for dates needed by the LQS monthly projection.
-- `/workspace/v1/timesheets` for month-to-date work-hour rows when available.
 
-Select the calendar month containing the visible report range. If the range crosses months, use the month with the most visible days.
+Select the calendar month containing the visible report range. If the range crosses months, use the month with the most visible days. The LQS calculation window is always the full selected calendar month:
 
-Use month-to-date timesheet or work-hour rows when available and scheduled rows for the remaining-month projection. If timesheets are unavailable or empty, use scheduled rows as fallback and state that in `LQS Requirement Notes`.
+```text
+first day of analysisMonth at 00:00:00 in the organisation timezone through first day of the next month at 00:00:00 exclusive
+```
 
-Write or refresh `reports/<start>-to-<end>/artifacts/schedule-context.json` with `analysisMonth`, `lqsMonthRows`, and `timesheets` metadata used by this stage.
+Fetch all pages for `/workspace/v2/shifts` and `/workspace/v2/shift-slots` across that full month. Use `includeUnpublished=true` and `includeUnassigned=true` for shift slots. Do not stop at the first page; follow `data.meta.nextCursor` while `data.meta.hasMore` is true.
+
+Use raw scheduled slot duration for hourly wage projection:
+
+```text
+rawScheduledHours = sum(timeEnd - timeStart) across all assigned Employee slots in the full LQS calculation month
+projectedMonthlyGross = rawScheduledHours * hourly compensation rate
+```
+
+Do not substitute timesheets, month-to-date work-hour rows, break-adjusted paid hours, or visible-week extrapolations for the selected calendar-month LQS quota count. Timesheets may be fetched only as optional source metadata; they must not change the quota numbers. If timesheets are unavailable, do not treat that as a fallback condition because the authoritative LQS run is raw scheduled-slot based.
+
+Write or refresh `reports/<start>-to-<end>/artifacts/schedule-context.json` with `analysisMonth`, `lqsCalculationWindow`, `rawScheduledSlotRows`, and pagination metadata used by this stage.
 
 ## Output
 
@@ -88,6 +98,7 @@ Criteria: gap is within $100 monthly gross or within 8 additional paid hours.
 - Use `sgStatutory.isPayingCpf === true` as the available StaffAny API proxy for Singapore Citizen / PR local employee status, after filtering to Employee access-level users.
 - If `isPayingCpf === false`, quota count is `0`; pass type remains unknown unless explicitly tagged.
 - In `LQS Staff Quota Detail`, explicitly show each included Employee's CPF contribution status, such as `CPF contributing: Yes` when `sgStatutory.isPayingCpf === true` and `CPF contributing: No` when it is false. This detail must make clear who is paying CPF and who is not.
+- In `LQS Staff Quota Detail`, show the `rawScheduledHours` used for hourly projections so reviewers can verify that the quota run used the full calendar-month raw schedule data.
 - Check the part-time hourly LQS wage requirement for locals under 35 hours/week, but keep it separate from monthly quota count.
 - Include MOM's requirement context for firms hiring foreign workers: they must pay PWM wages to local employees covered by relevant Sectoral or Occupational PWMs, and pay at least LQS to all local employees not covered under PWMs.
 - For the workshop, assume one PWM category applies: food services. This is a modelling assumption, not an API-proven classification.
@@ -105,6 +116,7 @@ Write `lqs-quota-analysis.json` with:
 - `sources`
 
 Each `lqsStaffChecklist` row must include an explicit CPF contribution field or label showing whether that Employee is CPF contributing.
+Each hourly `lqsStaffChecklist` row must include the full-month `rawScheduledHours`, the hourly compensation rate, and a projection basis that says `full calendar-month raw scheduled hours x hourly rate`.
 
 Do not use compliance framing, quick-win slang, or hard-code demo staff names in user-facing output. Decide opportunities from the current data.
 
@@ -128,4 +140,6 @@ Before finishing:
 4. Confirm Owner and Manager access-level users are absent from LQS staff detail and quota opportunity tables, except for an optional excluded-scope note.
 5. Confirm `03-lqs-quota-analysis.html` displays `CPF-contributing Employees`, not `Quota-eligible local workers`.
 6. Confirm `LQS Staff Quota Detail` explicitly shows who is CPF contributing and who is not.
-7. Scan `03-lqs-quota-analysis.html` for stale labels: `LQS Compliance`, `low-hanging`, `1.0 local count staff`, `0.5 local count staff`, and `Quota-eligible local workers`.
+7. Confirm hourly rows show full-month raw scheduled hours and a projection basis using full calendar-month raw scheduled hours.
+8. Confirm generated metadata shows the selected calendar-month calculation window and records all fetched shift-slot pages.
+9. Scan `03-lqs-quota-analysis.html` for stale labels: `LQS Compliance`, `low-hanging`, `1.0 local count staff`, `0.5 local count staff`, and `Quota-eligible local workers`.
