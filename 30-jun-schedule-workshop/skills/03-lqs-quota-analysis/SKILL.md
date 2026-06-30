@@ -29,6 +29,16 @@ If scheduled, timesheet, or compensation rows belong to an excluded access-level
 - StaffAny API JSON in the workshop folder, such as `api.json` or `api-1.json`, for endpoint reference.
 - `reportDir`: default `reports/<start>-to-<end>`.
 
+## Date Range Semantics
+
+The visible report `start` and `end` are inclusive dates.
+
+Workspace schedule endpoints use an exclusive end boundary. When fetching `/workspace/v2/shifts` and `/workspace/v2/shift-slots`, convert the visible `end` into `apiEnd = dayAfter(end)` and pass that as the endpoint `end` query value.
+
+Example: for visible report range `2026-07-01` to `2026-07-31`, fetch schedule rows with `start=2026-07-01&end=2026-08-01`.
+
+Keep the original inclusive `end` in output paths, report headings, and visible `schedule-context.json` metadata. If API fetch metadata is recorded, store the schedule API end separately as the exclusive `apiEnd`.
+
 ## Workspace API Fetch
 
 Fetch the data needed by this stage directly:
@@ -36,9 +46,9 @@ Fetch the data needed by this stage directly:
 - `/workspace/v1/orgs/current` for current organisation and timezone.
 - `/workspace/v1/staff`, including access level and `sgStatutory.isPayingCpf`.
 - `/workspace/v1/roles` and `/workspace/v1/sections`.
-- `/workspace/v2/shifts` and `/workspace/v2/shift-slots` for the visible report range.
+- `/workspace/v2/shifts` and `/workspace/v2/shift-slots` for the visible report range, using the exclusive API end date described above.
 - `/workspace/v2/compensation-snapshots` for visible-range dates needed by the report.
-- `/workspace/v2/shifts` and `/workspace/v2/shift-slots` for the selected LQS analysis month.
+- `/workspace/v2/shifts` and `/workspace/v2/shift-slots` for the selected LQS analysis month, using the exclusive API end date described above.
 - `/workspace/v2/compensation-snapshots` for dates needed by the LQS monthly projection.
 - `/workspace/v1/timesheets` for month-to-date work-hour rows when available.
 
@@ -141,4 +151,6 @@ Before finishing:
 5. Confirm `03-lqs-quota-analysis.html` displays `CPF-contributing Employees`, not `Quota-eligible local workers`.
 6. Confirm `LQS Staff Quota Detail` explicitly shows who is CPF contributing and who is not.
 7. Confirm scheduled paid hours used for LQS projections exclude shift break hours.
-8. Scan `03-lqs-quota-analysis.html` for stale labels: `LQS Compliance`, `low-hanging`, `1.0 local count staff`, `0.5 local count staff`, and `Quota-eligible local workers`.
+8. Confirm final visible day schedule rows are present when final-day shifts or shift slots exist.
+9. Confirm `schedule-context.json` records the visible `end` as the inclusive report end date, and if API fetch metadata is recorded, that the schedule API end is recorded separately as the exclusive `apiEnd`.
+10. Scan `03-lqs-quota-analysis.html` for stale labels: `LQS Compliance`, `low-hanging`, `1.0 local count staff`, `0.5 local count staff`, and `Quota-eligible local workers`.
